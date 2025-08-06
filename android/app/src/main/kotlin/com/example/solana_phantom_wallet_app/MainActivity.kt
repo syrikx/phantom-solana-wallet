@@ -25,13 +25,28 @@ class MainActivity: FlutterActivity() {
     
     private fun handleIntent(intent: Intent) {
         val data: Uri? = intent.data
-        if (data != null && data.scheme == "phantommainnet") {
-            Log.d("MainActivity", "Received deep link: ${data.toString()}")
+        Log.d("MainActivity", "handleIntent called with data: ${data?.toString()}")
+        
+        if (data != null) {
+            Log.d("MainActivity", "URI scheme: ${data.scheme}")
+            Log.d("MainActivity", "URI host: ${data.host}")
+            Log.d("MainActivity", "URI path: ${data.path}")
+            Log.d("MainActivity", "URI query: ${data.query}")
             
-            // Create method channel to communicate with Flutter
-            flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
-                MethodChannel(messenger, CHANNEL).invokeMethod("handlePhantomCallback", data.toString())
+            if (data.scheme == "phantommainnet") {
+                Log.d("MainActivity", "Processing Phantom callback: ${data.toString()}")
+                
+                // Create method channel to communicate with Flutter
+                flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
+                    MethodChannel(messenger, CHANNEL).invokeMethod("handlePhantomCallback", data.toString())
+                } ?: run {
+                    Log.e("MainActivity", "Flutter engine not ready")
+                }
+            } else {
+                Log.d("MainActivity", "URI scheme doesn't match phantommainnet: ${data.scheme}")
             }
+        } else {
+            Log.d("MainActivity", "No URI data in intent")
         }
     }
 }

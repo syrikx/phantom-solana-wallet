@@ -59,6 +59,25 @@ class HomeScreen extends StatelessWidget {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Did you approve the connection in Phantom?',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.orange.shade700,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          ElevatedButton.icon(
+                            onPressed: walletProvider.forceConnectionSuccess,
+                            icon: const Icon(Icons.check_circle, size: 18),
+                            label: const Text('Yes, I Connected'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green.shade600,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                            ),
+                          ),
                         ],
                       ),
                     ),

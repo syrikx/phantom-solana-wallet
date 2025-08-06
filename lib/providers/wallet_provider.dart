@@ -14,6 +14,7 @@ class WalletProvider extends ChangeNotifier {
   String? _sessionId;
   String? _encryptionPublicKey;
   double? _balance;
+  String? _lastSignature;
   late SolanaRpcService _rpcService;
   
   // Mainnet RPC endpoint
@@ -34,6 +35,7 @@ class WalletProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String get networkName => 'Mainnet';
   double? get balance => _balance;
+  String? get lastSignature => _lastSignature;
   
   // Constructor
   WalletProvider() {
@@ -176,6 +178,18 @@ class WalletProvider extends ChangeNotifier {
       debugPrint('URI host: ${uri.host}');
       debugPrint('URI path: ${uri.path}');
       
+      // Check if this is a signing response
+      if (uri.host == 'signed') {
+        await _handleSigningResponse(uri);
+        return;
+      }
+      
+      // Check if this is a transaction response
+      if (uri.host == 'transaction') {
+        await _handleTransactionResponse(uri);
+        return;
+      }
+      
       final queryParams = uri.queryParameters;
       debugPrint('Query parameters: $queryParams');
       
@@ -253,6 +267,122 @@ class WalletProvider extends ChangeNotifier {
       _errorMessage = 'Failed to process Phantom response: $error';
       _isConnecting = false;
       _isConnected = false;
+      notifyListeners();
+    }
+  }
+  
+  // Handle transaction response from Phantom
+  Future<void> _handleTransactionResponse(Uri uri) async {
+    try {
+      final queryParams = uri.queryParameters;
+      debugPrint('Handling transaction response: $queryParams');
+      
+      if (queryParams.containsKey('errorCode') || queryParams.containsKey('errorMessage')) {
+        final errorCode = queryParams['errorCode'] ?? 'unknown';
+        final errorMessage = queryParams['errorMessage'] ?? 'Transaction failed';
+        throw Exception('Phantom transaction failed: $errorMessage (Code: $errorCode)');
+      }
+      
+      // Look for transaction signature in response
+      String? transactionSignature;
+      if (queryParams.containsKey('signature')) {
+        transactionSignature = queryParams['signature'];
+      } else if (queryParams.containsKey('transaction')) {
+        transactionSignature = queryParams['transaction'];
+      } else if (queryParams.containsKey('data')) {
+        final data = queryParams['data'];
+        if (data != null) {
+          try {
+            final decodedBytes = base64Decode(data);
+            final decodedString = utf8.decode(decodedBytes);
+            final decodedData = jsonDecode(decodedString);
+            
+            if (decodedData is Map<String, dynamic>) {
+              transactionSignature = decodedData['signature'] ?? decodedData['transaction'];
+            }
+          } catch (e) {
+            debugPrint('Error decoding transaction data: $e');
+            transactionSignature = data;
+          }
+        }
+      }
+      
+      if (transactionSignature != null && transactionSignature.isNotEmpty) {
+        debugPrint('Transaction sent successfully via Phantom');
+        debugPrint('Transaction signature: $transactionSignature');
+        
+        _isConnecting = false;
+        _errorMessage = null;
+        
+        // Store the transaction signature
+        _lastSignature = transactionSignature;
+        
+        // Refresh balance after successful transaction
+        await _fetchAccountBalance();
+        
+        notifyListeners();
+      } else {
+        throw Exception('No transaction signature found in Phantom response');
+      }
+    } catch (error) {
+      debugPrint('Error handling transaction response: $error');
+      _errorMessage = 'Transaction failed: $error';
+      _isConnecting = false;
+      notifyListeners();
+    }
+  }
+  
+  // Handle signing response from Phantom
+  Future<void> _handleSigningResponse(Uri uri) async {
+    try {
+      final queryParams = uri.queryParameters;
+      debugPrint('Handling signing response: $queryParams');
+      
+      if (queryParams.containsKey('errorCode') || queryParams.containsKey('errorMessage')) {
+        final errorCode = queryParams['errorCode'] ?? 'unknown';
+        final errorMessage = queryParams['errorMessage'] ?? 'Signing failed';
+        throw Exception('Phantom signing failed: $errorMessage (Code: $errorCode)');
+      }
+      
+      // Look for signature in response
+      String? signature;
+      if (queryParams.containsKey('signature')) {
+        signature = queryParams['signature'];
+      } else if (queryParams.containsKey('data')) {
+        final data = queryParams['data'];
+        if (data != null) {
+          try {
+            final decodedBytes = base64Decode(data);
+            final decodedString = utf8.decode(decodedBytes);
+            final decodedData = jsonDecode(decodedString);
+            
+            if (decodedData is Map<String, dynamic> && decodedData.containsKey('signature')) {
+              signature = decodedData['signature'];
+            }
+          } catch (e) {
+            debugPrint('Error decoding signature data: $e');
+            signature = data; // Use raw data as signature
+          }
+        }
+      }
+      
+      if (signature != null && signature.isNotEmpty) {
+        debugPrint('Message signed successfully by Phantom');
+        debugPrint('Signature: $signature');
+        
+        _isConnecting = false;
+        _errorMessage = null;
+        
+        // Store the signature for retrieval
+        _lastSignature = signature;
+        notifyListeners();
+      } else {
+        throw Exception('No signature found in Phantom response');
+      }
+    } catch (error) {
+      debugPrint('Error handling signing response: $error');
+      _errorMessage = 'Failed to process signature: $error';
+      _isConnecting = false;
       notifyListeners();
     }
   }
@@ -347,36 +477,91 @@ class WalletProvider extends ChangeNotifier {
     }
   }
   
-  // Sign message with Phantom wallet (Mainnet)
+  // Sign message with real Phantom wallet via deep link
   Future<String?> signMessage(String message) async {
     try {
       if (!_isConnected) {
         throw Exception('Wallet not connected to Mainnet');
       }
 
-      // For real Phantom integration, we would use deep links to request signing
-      // For now, we'll simulate the signing process but with better RPC integration
-      debugPrint('Requesting message signature from Phantom wallet...');
+      // Skip demo mode
+      if (_walletAddress == '11111111111111111111111111111112') {
+        // For demo mode, return a mock signature
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        return 'demo_signature_${timestamp}_${message.hashCode}';
+      }
+
+      debugPrint('Requesting message signature from real Phantom wallet...');
       debugPrint('Network: Mainnet');
       debugPrint('Message: $message');
       
-      // Check RPC health first
-      final isHealthy = await _rpcService.isHealthy();
-      if (!isHealthy) {
-        throw Exception('Solana RPC service is not available. Please try again later.');
+      // Launch Phantom for message signing
+      final success = await _launchPhantomSignMessage(message);
+      
+      if (success) {
+        // Set up a listener for the signature response
+        _isConnecting = true;
+        notifyListeners();
+        
+        // Return null for now - the actual signature will come via deep link
+        return null;
+      } else {
+        throw Exception('Failed to launch Phantom for message signing');
       }
-      
-      // Simulate signing delay
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Generate mainnet-compatible signature format
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      return 'mainnet_signature_${timestamp}_${message.hashCode}';
     } catch (error) {
       debugPrint('Sign message error: $error');
-      _errorMessage = 'Failed to sign message on Mainnet: $error';
+      _errorMessage = 'Failed to sign message: $error';
       notifyListeners();
       return null;
+    }
+  }
+  
+  // Launch Phantom for message signing
+  Future<bool> _launchPhantomSignMessage(String message) async {
+    try {
+      // Encode message to base64
+      final messageBytes = utf8.encode(message);
+      final encodedMessage = base64Encode(messageBytes);
+      
+      // Create sign message request parameters
+      final params = {
+        'dapp_encryption_public_key': _encryptionPublicKey ?? _generateEncryptionKey(),
+        'nonce': _generateSessionId(),
+        'redirect_link': '$redirectScheme://signed',
+        'payload': encodedMessage,
+      };
+      
+      // Encode parameters for URL
+      final queryString = params.entries
+          .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+          .join('&');
+      
+      // Try Phantom deep link for signing
+      final deepLinkUrl = '${phantomDeepLink}v1/signMessage?$queryString';
+      
+      debugPrint('Launching Phantom for message signing...');
+      debugPrint('Sign URL: $deepLinkUrl');
+      
+      final Uri deepLinkUri = Uri.parse(deepLinkUrl);
+      
+      if (await canLaunchUrl(deepLinkUri)) {
+        return await launchUrl(
+          deepLinkUri,
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        // Fallback to universal link
+        final universalLinkUrl = '${phantomUniversalLink}signMessage?$queryString';
+        final Uri universalUri = Uri.parse(universalLinkUrl);
+        
+        return await launchUrl(
+          universalUri,
+          mode: LaunchMode.externalApplication,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error launching Phantom for signing: $e');
+      return false;
     }
   }
   
@@ -401,6 +586,91 @@ class WalletProvider extends ChangeNotifier {
       debugPrint('Failed to refresh account data: $error');
       _errorMessage = 'Unable to refresh data. Please check your connection and try again.';
       notifyListeners();
+    }
+  }
+
+  // Send SOL via Phantom wallet
+  Future<String?> sendSOL({
+    required String recipientAddress,
+    required double amount,
+  }) async {
+    try {
+      if (!_isConnected) {
+        throw Exception('Wallet not connected');
+      }
+
+      // Skip demo mode  
+      if (_walletAddress == '11111111111111111111111111111112') {
+        throw Exception('SOL transfer not available in demo mode. Connect real Phantom wallet.');
+      }
+
+      debugPrint('Sending $amount SOL to $recipientAddress via Phantom...');
+      
+      // Launch Phantom for transaction
+      final success = await _launchPhantomTransaction(recipientAddress, amount);
+      
+      if (success) {
+        _isConnecting = true;
+        notifyListeners();
+        return null; // Transaction result will come via deep link
+      } else {
+        throw Exception('Failed to launch Phantom for transaction');
+      }
+    } catch (error) {
+      debugPrint('SOL transfer error: $error');
+      _errorMessage = 'Failed to send SOL: $error';
+      notifyListeners();
+      return null;
+    }
+  }
+  
+  // Launch Phantom for SOL transaction
+  Future<bool> _launchPhantomTransaction(String recipientAddress, double amount) async {
+    try {
+      // Convert SOL to lamports
+      final lamports = (amount * 1000000000).toInt();
+      
+      // Create transaction parameters
+      final params = {
+        'dapp_encryption_public_key': _encryptionPublicKey ?? _generateEncryptionKey(),
+        'nonce': _generateSessionId(),
+        'redirect_link': '$redirectScheme://transaction',
+        'recipient': recipientAddress,
+        'amount': lamports.toString(),
+        'memo': 'Transfer from Phantom Solana Wallet App',
+      };
+      
+      // Encode parameters for URL
+      final queryString = params.entries
+          .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+          .join('&');
+      
+      // Try Phantom deep link for transaction
+      final deepLinkUrl = '${phantomDeepLink}v1/signAndSendTransaction?$queryString';
+      
+      debugPrint('Launching Phantom for SOL transfer...');
+      debugPrint('Transaction URL: $deepLinkUrl');
+      
+      final Uri deepLinkUri = Uri.parse(deepLinkUrl);
+      
+      if (await canLaunchUrl(deepLinkUri)) {
+        return await launchUrl(
+          deepLinkUri,
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        // Fallback to universal link
+        final universalLinkUrl = '${phantomUniversalLink}signAndSendTransaction?$queryString';
+        final Uri universalUri = Uri.parse(universalLinkUrl);
+        
+        return await launchUrl(
+          universalUri,
+          mode: LaunchMode.externalApplication,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error launching Phantom for transaction: $e');
+      return false;
     }
   }
 

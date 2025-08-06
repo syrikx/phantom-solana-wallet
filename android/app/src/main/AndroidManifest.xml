@@ -50,8 +50,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="phantommainnet" 
-                      android:host="connected" />
+                <data android:scheme="phantommainnet" />
             </intent-filter>
         </activity>
         

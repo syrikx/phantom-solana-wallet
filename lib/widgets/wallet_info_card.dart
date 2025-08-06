@@ -114,7 +114,7 @@ class WalletInfoCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Network: Devnet',
+                      'Network: Mainnet',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],

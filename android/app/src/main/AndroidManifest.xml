@@ -1,17 +1,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     
-    <!-- Internet permission for wallet connections -->
+    <!-- Internet permission for Mainnet wallet connections -->
     <uses-permission android:name="android.permission.INTERNET" />
     
     <!-- Network state permission -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
-    <!-- Phantom wallet deep link handling -->
+    <!-- Phantom wallet deep link handling for Mainnet -->
     <queries>
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="phantom" />
         </intent>
         <package android:name="app.phantom" />
     </queries>
@@ -40,13 +45,13 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
             
-            <!-- Deep link handling for wallet callbacks -->
+            <!-- Deep link handling for Phantom wallet callbacks (Mainnet) -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="yourdapp" 
-                      android:host="solana" />
+                <data android:scheme="phantommainnet" 
+                      android:host="connected" />
             </intent-filter>
         </activity>
         

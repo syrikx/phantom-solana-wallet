@@ -114,11 +114,24 @@ class WalletInfoCard extends StatelessWidget {
                         size: 20,
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        'Balance: ${walletProvider.balance?.toStringAsFixed(4) ?? '0.0000'} SOL',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Balance: ${walletProvider.balance?.toStringAsFixed(4) ?? '0.0000'} SOL',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (walletProvider.walletAddress == '11111111111111111111111111111112')
+                            Text(
+                              'Demo Mode',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.orange.shade600,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                        ],
                       ),
                       const Spacer(),
                       IconButton(

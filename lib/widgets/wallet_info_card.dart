@@ -104,6 +104,33 @@ class WalletInfoCard extends StatelessWidget {
                 
                 const SizedBox(height: 16),
                 
+                // Balance Info
+                if (walletProvider.balance != null)
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.account_balance_wallet,
+                        color: Colors.green,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Balance: ${walletProvider.balance?.toStringAsFixed(4) ?? '0.0000'} SOL',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: walletProvider.refreshAccountData,
+                        icon: const Icon(Icons.refresh, size: 18),
+                        tooltip: 'Refresh balance',
+                      ),
+                    ],
+                  ),
+                
+                const SizedBox(height: 8),
+                
                 // Network Info
                 Row(
                   children: [

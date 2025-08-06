@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'dart:math';
+import '../services/solana_rpc_service.dart';
 
 class WalletProvider extends ChangeNotifier {
   String? _walletAddress;
@@ -12,6 +13,8 @@ class WalletProvider extends ChangeNotifier {
   String? _errorMessage;
   String? _sessionId;
   String? _encryptionPublicKey;
+  double? _balance;
+  late SolanaRpcService _rpcService;
   
   // Mainnet RPC endpoint
   static const String mainnetRpcUrl = 'https://api.mainnet-beta.solana.com';
@@ -30,6 +33,12 @@ class WalletProvider extends ChangeNotifier {
   bool get isConnecting => _isConnecting;
   String? get errorMessage => _errorMessage;
   String get networkName => 'Mainnet';
+  double? get balance => _balance;
+  
+  // Constructor
+  WalletProvider() {
+    _rpcService = SolanaRpcService(rpcUrl: mainnetRpcUrl);
+  }
   
   // Generate a unique session ID for this connection attempt
   String _generateSessionId() {
@@ -218,6 +227,9 @@ class WalletProvider extends ChangeNotifier {
         debugPrint('Successfully connected to Phantom wallet');
         debugPrint('Wallet address: $_walletAddress');
         
+        // Fetch account balance
+        _fetchAccountBalance();
+        
         notifyListeners();
       } else {
         // If we reach here, we got some response but couldn't find the public key
@@ -304,6 +316,22 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
+  // Fetch account balance from Solana RPC
+  Future<void> _fetchAccountBalance() async {
+    if (_walletAddress == null) return;
+    
+    try {
+      debugPrint('Fetching balance for address: $_walletAddress');
+      _balance = await _rpcService.getBalance(_walletAddress!);
+      debugPrint('Account balance: $_balance SOL');
+      notifyListeners();
+    } catch (error) {
+      debugPrint('Failed to fetch balance: $error');
+      // Don't set error message for balance fetch failure
+      _balance = null;
+    }
+  }
+  
   // Sign message with Phantom wallet (Mainnet)
   Future<String?> signMessage(String message) async {
     try {
@@ -311,10 +339,17 @@ class WalletProvider extends ChangeNotifier {
         throw Exception('Wallet not connected to Mainnet');
       }
 
-      // In production, this would make a request to Phantom to sign the message
+      // For real Phantom integration, we would use deep links to request signing
+      // For now, we'll simulate the signing process but with better RPC integration
       debugPrint('Requesting message signature from Phantom wallet...');
       debugPrint('Network: Mainnet');
       debugPrint('Message: $message');
+      
+      // Check RPC health first
+      final isHealthy = await _rpcService.isHealthy();
+      if (!isHealthy) {
+        throw Exception('Solana RPC service is not available. Please try again later.');
+      }
       
       // Simulate signing delay
       await Future.delayed(const Duration(seconds: 1));
@@ -323,14 +358,34 @@ class WalletProvider extends ChangeNotifier {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       return 'mainnet_signature_${timestamp}_${message.hashCode}';
     } catch (error) {
+      debugPrint('Sign message error: $error');
       _errorMessage = 'Failed to sign message on Mainnet: $error';
       notifyListeners();
       return null;
+    }
+  }
+  
+  // Refresh account data
+  Future<void> refreshAccountData() async {
+    if (!_isConnected || _walletAddress == null) return;
+    
+    try {
+      await _fetchAccountBalance();
+    } catch (error) {
+      debugPrint('Failed to refresh account data: $error');
+      _errorMessage = 'Failed to refresh account data: $error';
+      notifyListeners();
     }
   }
 
   void clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+  
+  @override
+  void dispose() {
+    _rpcService.dispose();
+    super.dispose();
   }
 }

@@ -267,10 +267,17 @@ class WalletProvider extends ChangeNotifier {
   // Handle deep link response from Phantom wallet
   Future<void> handlePhantomResponse(Uri uri) async {
     try {
+      debugPrint('=== PHANTOM RESPONSE DEBUG START ===');
       debugPrint('Received deep link response: ${uri.toString()}');
       debugPrint('URI scheme: ${uri.scheme}');
       debugPrint('URI host: ${uri.host}');
       debugPrint('URI path: ${uri.path}');
+      debugPrint('URI fragment: ${uri.fragment}');
+      debugPrint('URI query: ${uri.query}');
+      debugPrint('Full URI breakdown:');
+      debugPrint('  - Authority: ${uri.authority}');
+      debugPrint('  - UserInfo: ${uri.userInfo}');
+      debugPrint('  - Port: ${uri.port}');
       
       // Check if this is a signing response
       if (uri.host == 'signed') {
@@ -285,24 +292,42 @@ class WalletProvider extends ChangeNotifier {
       }
       
       final queryParams = uri.queryParameters;
+      debugPrint('Query parameters count: ${queryParams.length}');
       debugPrint('Query parameters: $queryParams');
+      
+      // Log each query parameter individually for better debugging
+      queryParams.forEach((key, value) {
+        debugPrint('  - $key: $value');
+      });
       
       // Check for error conditions first
       if (queryParams.containsKey('errorCode') || queryParams.containsKey('errorMessage')) {
         final errorCode = queryParams['errorCode'] ?? 'unknown';
         final errorMessage = queryParams['errorMessage'] ?? 'Unknown error occurred';
+        debugPrint('ERROR: Phantom returned error - Code: $errorCode, Message: $errorMessage');
         throw Exception('Phantom connection failed: $errorMessage (Code: $errorCode)');
+      }
+      
+      // Also check for 'error' parameter (some Phantom versions use this)
+      if (queryParams.containsKey('error')) {
+        final error = queryParams['error'] ?? 'Unknown error';
+        debugPrint('ERROR: Phantom returned error parameter: $error');
+        throw Exception('Phantom connection failed: $error');
       }
       
       // Check for successful connection with various possible parameter names
       String? publicKey;
+      debugPrint('Searching for public key in response...');
       
       // Try different possible parameter names for public key
       if (queryParams.containsKey('public_key')) {
         publicKey = queryParams['public_key'];
+        debugPrint('Found public_key parameter: $publicKey');
       } else if (queryParams.containsKey('publicKey')) {
         publicKey = queryParams['publicKey'];
+        debugPrint('Found publicKey parameter: $publicKey');
       } else if (queryParams.containsKey('data')) {
+        debugPrint('Found data parameter, attempting to decode...');
         // Sometimes the data is encoded in a 'data' parameter
         final data = queryParams['data'];
         debugPrint('Encoded data parameter: $data');
@@ -357,11 +382,19 @@ class WalletProvider extends ChangeNotifier {
         }
       }
     } catch (error) {
+      debugPrint('=== PHANTOM RESPONSE ERROR ===');
       debugPrint('Error processing Phantom response: $error');
+      debugPrint('Error type: ${error.runtimeType}');
+      debugPrint('Stack trace will be printed below...');
+      debugPrint('=== END PHANTOM RESPONSE DEBUG ===');
+      
       _errorMessage = 'Failed to process Phantom response: $error';
       _isConnecting = false;
       _isConnected = false;
       notifyListeners();
+      
+      // Re-throw to see stack trace in logs
+      rethrow;
     }
   }
   

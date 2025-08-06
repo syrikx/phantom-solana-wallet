@@ -36,13 +36,20 @@ class _MyAppState extends State<MyApp> {
     switch (call.method) {
       case 'handlePhantomCallback':
         final String uriString = call.arguments;
+        debugPrint('=== MAIN.DART PHANTOM CALLBACK ===');
         debugPrint('Received Phantom callback: $uriString');
+        debugPrint('Attempting to parse URI and handle response...');
         
         try {
           final Uri uri = Uri.parse(uriString);
+          debugPrint('URI parsed successfully');
           await _walletProvider.handlePhantomResponse(uri);
-        } catch (e) {
+          debugPrint('Phantom response handled successfully');
+        } catch (e, stackTrace) {
+          debugPrint('=== MAIN.DART ERROR ===');
           debugPrint('Error handling Phantom callback: $e');
+          debugPrint('Stack trace: $stackTrace');
+          debugPrint('=== END MAIN.DART ERROR ===');
         }
         break;
       default:

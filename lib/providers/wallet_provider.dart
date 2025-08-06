@@ -96,9 +96,9 @@ class WalletProvider extends ChangeNotifier {
     }
   }
   
-  // Start connection timeout
+  // Start connection timeout (extended for Phantom authentication)
   void _startConnectionTimeout() {
-    Future.delayed(const Duration(seconds: 30), () {
+    Future.delayed(const Duration(seconds: 120), () { // 2분으로 연장
       if (_isConnecting) {
         // Connection timed out, offer alternatives
         _handleConnectionTimeout();
@@ -120,10 +120,10 @@ class WalletProvider extends ChangeNotifier {
   // Handle connection timeout
   void _handleConnectionTimeout() {
     _isConnecting = false;
-    _errorMessage = 'Connection timed out. You can:\n'
-        '1. Try again if Phantom app opened\n'
-        '2. Try web connection below\n'
-        '3. Make sure Phantom app is installed';
+    _errorMessage = 'Connection timed out (2 minutes). You can:\n'
+        '1. Try again - Make sure to unlock Phantom and approve connection\n'
+        '2. Use web browser connection as alternative\n'
+        '3. Check if Phantom app is properly installed and updated';
     notifyListeners();
   }
   
@@ -177,7 +177,8 @@ class WalletProvider extends ChangeNotifier {
   
   void _showConnectionPendingMessage() {
     debugPrint('Waiting for Phantom wallet response...');
-    debugPrint('Please complete the connection in Phantom app and return to this app');
+    debugPrint('IMPORTANT: Please unlock Phantom app if locked, approve the connection, and return to this app');
+    debugPrint('This may take up to 2 minutes if you need to authenticate');
   }
   
   // Launch Phantom app for wallet connection

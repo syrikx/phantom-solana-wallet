@@ -18,6 +18,18 @@ dependencies:
   
   # UI components
   cupertino_icons: ^1.0.2
+  
+  # URL launcher for deep links
+  url_launcher: ^6.2.4
+  
+  # HTTP requests for Solana RPC
+  http: ^1.2.0
+  
+  # Crypto utilities
+  crypto: ^3.0.3
+  
+  # JSON handling
+  convert: ^3.1.1
 
 dev_dependencies:
   flutter_test:

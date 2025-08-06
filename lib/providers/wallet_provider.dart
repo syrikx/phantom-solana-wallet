@@ -1,44 +1,63 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
+import 'dart:math';
 
 class WalletProvider extends ChangeNotifier {
   String? _walletAddress;
   bool _isConnected = false;
   bool _isConnecting = false;
   String? _errorMessage;
+  String? _sessionId;
+  String? _encryptionPublicKey;
   
   // Mainnet RPC endpoint
   static const String mainnetRpcUrl = 'https://api.mainnet-beta.solana.com';
   
-  // Phantom deep link scheme
-  static const String phantomDeepLink = 'https://phantom.app/ul/';
+  // Phantom deep link schemes
+  static const String phantomUniversalLink = 'https://phantom.app/ul/';
+  static const String phantomDeepLink = 'phantom://';
+  
+  // App metadata for Phantom
+  static const String appName = 'Solana Phantom Wallet';
+  static const String appUrl = 'https://phantom-solana-wallet.app';
+  static const String redirectScheme = 'phantommainnet';
 
   String? get walletAddress => _walletAddress;
   bool get isConnected => _isConnected;
   bool get isConnecting => _isConnecting;
   String? get errorMessage => _errorMessage;
   String get networkName => 'Mainnet';
+  
+  // Generate a unique session ID for this connection attempt
+  String _generateSessionId() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (i) => random.nextInt(256));
+    return base64Encode(bytes);
+  }
 
   // Connect to Phantom wallet via deep link (Mainnet)
   Future<void> connectWithPhantom() async {
     try {
       _isConnecting = true;
       _errorMessage = null;
+      _sessionId = _generateSessionId();
       notifyListeners();
 
       // Create connect request for Phantom wallet
-      await _launchPhantomConnect();
+      final connected = await _launchPhantomConnect();
       
-      // Note: In a real implementation, you would handle the deep link response
-      // For now, we'll simulate successful connection after user interaction
-      await Future.delayed(const Duration(seconds: 3));
+      if (connected) {
+        debugPrint('Phantom wallet connection initiated successfully');
+        // The actual wallet address will be set when the deep link callback is handled
+        // For now, we'll wait for user to return from Phantom app
+        _showConnectionPendingMessage();
+      } else {
+        throw Exception('Failed to launch Phantom wallet app');
+      }
       
-      // In production, this would be the actual wallet address returned by Phantom
-      // This is still a demo address but represents Mainnet connection
-      _walletAddress = _generateMainnetDemoAddress();
-      _isConnected = true;
-      _isConnecting = false;
-      notifyListeners();
     } catch (error) {
       _errorMessage = 'Failed to connect to Phantom: $error';
       _isConnecting = false;
@@ -46,20 +65,102 @@ class WalletProvider extends ChangeNotifier {
     }
   }
   
+  void _showConnectionPendingMessage() {
+    debugPrint('Waiting for Phantom wallet response...');
+    debugPrint('Please complete the connection in Phantom app and return to this app');
+  }
+  
   // Launch Phantom app for wallet connection
-  Future<void> _launchPhantomConnect() async {
-    final connectUrl = '${phantomDeepLink}v1/connect?app_url=https://phantom-solana-wallet.app&cluster=mainnet-beta';
+  Future<bool> _launchPhantomConnect() async {
+    // Create the connection request parameters
+    final params = {
+      'app_url': appUrl,
+      'dapp_encryption_public_key': _generateEncryptionKey(),
+      'redirect_link': '$redirectScheme://connected',
+      'cluster': 'mainnet-beta',
+    };
+    
+    // Encode parameters for URL
+    final queryString = params.entries
+        .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+        .join('&');
+    
+    // Try Phantom deep link first (if app is installed)
+    final deepLinkUrl = '${phantomDeepLink}v1/connect?$queryString';
     
     try {
-      // In a real app, you would use url_launcher package to open this URL
-      debugPrint('Opening Phantom wallet: $connectUrl');
-      // await launchUrl(Uri.parse(connectUrl));
+      debugPrint('Attempting to launch Phantom app...');
+      debugPrint('Deep link: $deepLinkUrl');
+      
+      final Uri deepLinkUri = Uri.parse(deepLinkUrl);
+      
+      if (await canLaunchUrl(deepLinkUri)) {
+        debugPrint('Phantom app detected, launching...');
+        return await launchUrl(
+          deepLinkUri,
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        // Fallback to universal link (will redirect to app store if not installed)
+        final universalLinkUrl = '${phantomUniversalLink}connect?$queryString';
+        final Uri universalUri = Uri.parse(universalLinkUrl);
+        
+        debugPrint('Phantom app not detected, using universal link...');
+        debugPrint('Universal link: $universalLinkUrl');
+        
+        return await launchUrl(
+          universalUri,
+          mode: LaunchMode.externalApplication,
+        );
+      }
     } catch (e) {
+      debugPrint('Error launching Phantom wallet: $e');
       throw Exception('Failed to launch Phantom wallet: $e');
     }
   }
   
-  // Generate a demo mainnet address (in production, this comes from Phantom)
+  // Generate encryption key for secure communication
+  String _generateEncryptionKey() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(32, (i) => random.nextInt(256));
+    _encryptionPublicKey = base64Encode(bytes);
+    return _encryptionPublicKey!;
+  }
+  
+  // Handle deep link response from Phantom wallet
+  Future<void> handlePhantomResponse(Uri uri) async {
+    try {
+      debugPrint('Received deep link response: ${uri.toString()}');
+      
+      final queryParams = uri.queryParameters;
+      
+      if (queryParams.containsKey('public_key')) {
+        // Successfully connected
+        _walletAddress = queryParams['public_key'];
+        _isConnected = true;
+        _isConnecting = false;
+        _errorMessage = null;
+        
+        debugPrint('Successfully connected to Phantom wallet');
+        debugPrint('Wallet address: $_walletAddress');
+        
+        notifyListeners();
+      } else if (queryParams.containsKey('error')) {
+        // Connection failed
+        final error = queryParams['error'] ?? 'Unknown error';
+        throw Exception('Phantom connection failed: $error');
+      } else {
+        throw Exception('Invalid response from Phantom wallet');
+      }
+    } catch (error) {
+      _errorMessage = 'Failed to process Phantom response: $error';
+      _isConnecting = false;
+      _isConnected = false;
+      notifyListeners();
+    }
+  }
+  
+  // Generate a demo mainnet address (fallback for testing)
   String _generateMainnetDemoAddress() {
     // This is a valid Solana mainnet address format for demo purposes
     return 'DXH4DXXfkrX8Xz6oiZCbRy9KZxX7ZqX8X9XqXzXqXzXq';

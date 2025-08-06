@@ -60,6 +60,33 @@ class WalletConnectionCard extends StatelessWidget {
                 
                 const SizedBox(height: 12),
                 
+                // Web Browser Connection Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: walletProvider.isConnecting 
+                        ? null 
+                        : walletProvider.connectViaBrowser,
+                    icon: walletProvider.isConnecting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.web),
+                    label: Text(
+                      walletProvider.isConnecting 
+                          ? 'Connecting...' 
+                          : 'Connect via Web Browser'
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      backgroundColor: Colors.orange.shade600,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                
                 const SizedBox(height: 8),
                 Text(
                   '— OR —',
@@ -105,8 +132,9 @@ class WalletConnectionCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '• Phantom: Requires Phantom app installed\n'
-                        '• Demo: For testing without Phantom app',
+                        '• Phantom App: Direct app connection (recommended)\n'
+                        '• Web Browser: Alternative if app fails\n'
+                        '• Demo: For testing without Phantom wallet',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.blue.shade700,
                         ),

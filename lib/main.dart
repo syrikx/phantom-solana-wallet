@@ -17,6 +17,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late WalletProvider _walletProvider;
+  static const platform = MethodChannel('phantom_wallet_channel');
   
   @override
   void initState() {
@@ -26,26 +27,26 @@ class _MyAppState extends State<MyApp> {
   }
   
   void _initializeDeepLinkHandling() {
-    // Listen for deep link events when app is already running
-    _handleIncomingLinks();
-    
-    // Handle deep link when app is launched from a deep link
-    _handleInitialLink();
+    // Set up method channel listener for Android deep links
+    platform.setMethodCallHandler(_handleMethodCall);
+    debugPrint('Deep link handler initialized with MethodChannel');
   }
   
-  void _handleIncomingLinks() {
-    // This would typically use a package like app_links or receive_sharing_intent
-    // For now, we'll set up basic handling
-    debugPrint('Deep link handler initialized');
-  }
-  
-  void _handleInitialLink() async {
-    try {
-      // Check if the app was launched from a deep link
-      // This is a simplified version - in production you'd use a proper deep link package
-      debugPrint('Checking for initial deep link...');
-    } catch (e) {
-      debugPrint('Error handling initial link: $e');
+  Future<dynamic> _handleMethodCall(MethodCall call) async {
+    switch (call.method) {
+      case 'handlePhantomCallback':
+        final String uriString = call.arguments;
+        debugPrint('Received Phantom callback: $uriString');
+        
+        try {
+          final Uri uri = Uri.parse(uriString);
+          await _walletProvider.handlePhantomResponse(uri);
+        } catch (e) {
+          debugPrint('Error handling Phantom callback: $e');
+        }
+        break;
+      default:
+        throw MissingPluginException('Not implemented: ${call.method}');
     }
   }
 

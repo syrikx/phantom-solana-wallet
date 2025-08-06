@@ -46,16 +46,17 @@ class WalletProvider extends ChangeNotifier {
       _sessionId = _generateSessionId();
       notifyListeners();
 
-      // Create connect request for Phantom wallet
+      // Try to connect to Phantom with timeout
       final connected = await _launchPhantomConnect();
       
       if (connected) {
         debugPrint('Phantom wallet connection initiated successfully');
-        // The actual wallet address will be set when the deep link callback is handled
-        // For now, we'll wait for user to return from Phantom app
         _showConnectionPendingMessage();
+        
+        // Set a timeout for the connection
+        _startConnectionTimeout();
       } else {
-        throw Exception('Failed to launch Phantom wallet app');
+        throw Exception('Failed to launch Phantom wallet app. Please make sure Phantom is installed.');
       }
       
     } catch (error) {
@@ -63,6 +64,26 @@ class WalletProvider extends ChangeNotifier {
       _isConnecting = false;
       notifyListeners();
     }
+  }
+  
+  // Start connection timeout
+  void _startConnectionTimeout() {
+    Future.delayed(const Duration(seconds: 30), () {
+      if (_isConnecting) {
+        // Connection timed out, offer alternatives
+        _handleConnectionTimeout();
+      }
+    });
+  }
+  
+  // Handle connection timeout
+  void _handleConnectionTimeout() {
+    _isConnecting = false;
+    _errorMessage = 'Connection timed out. You can:\n'
+        '1. Try again if Phantom app opened\n'
+        '2. Use the manual connection option below\n'
+        '3. Make sure Phantom app is installed';
+    notifyListeners();
   }
   
   void _showConnectionPendingMessage() {
@@ -166,28 +187,45 @@ class WalletProvider extends ChangeNotifier {
     return 'DXH4DXXfkrX8Xz6oiZCbRy9KZxX7ZqX8X9XqXzXqXzXq';
   }
 
-  // Alternative connection method (Web3 adapter style for Mainnet)
+  // Alternative connection method - Manual/Demo connection for testing
   Future<void> connectWithAdapter() async {
     try {
       _isConnecting = true;
       _errorMessage = null;
       notifyListeners();
 
-      // Simulate wallet adapter connection to Mainnet
-      await Future.delayed(const Duration(seconds: 2));
+      // Give user feedback that we're trying an alternative method
+      debugPrint('Attempting alternative connection method...');
+      await Future.delayed(const Duration(seconds: 1));
       
-      // Generate mainnet-compatible demo address
+      // For demo purposes, generate a mainnet-style address
+      // In a real app, this would connect via a web adapter or browser extension
       _walletAddress = _generateMainnetDemoAddress();
       _isConnected = true;
       _isConnecting = false;
       
-      debugPrint('Connected to Solana Mainnet via adapter');
+      debugPrint('Connected to Solana Mainnet via alternative method');
+      debugPrint('Note: This is a demo connection for testing purposes');
       notifyListeners();
     } catch (error) {
       _errorMessage = 'Failed to connect wallet to Mainnet: $error';
       _isConnecting = false;
       notifyListeners();
     }
+  }
+  
+  // Cancel connection attempt
+  void cancelConnection() {
+    _isConnecting = false;
+    _errorMessage = null;
+    notifyListeners();
+  }
+  
+  // Retry connection
+  Future<void> retryConnection() async {
+    _errorMessage = null;
+    notifyListeners();
+    await connectWithPhantom();
   }
 
   // Disconnect wallet

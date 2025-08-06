@@ -45,6 +45,20 @@ class HomeScreen extends StatelessWidget {
                             style: Theme.of(context).textTheme.bodyMedium,
                             textAlign: TextAlign.center,
                           ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              TextButton(
+                                onPressed: walletProvider.cancelConnection,
+                                child: const Text('Cancel'),
+                              ),
+                              ElevatedButton(
+                                onPressed: walletProvider.retryConnection,
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),

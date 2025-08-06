@@ -60,15 +60,25 @@ class WalletConnectionCard extends StatelessWidget {
                 
                 const SizedBox(height: 12),
                 
-                // Alternative: Wallet Adapter Connection
+                const SizedBox(height: 8),
+                Text(
+                  '— OR —',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey.shade600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                
+                // Alternative: Demo Connection for Testing
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: walletProvider.isConnecting 
                         ? null 
                         : walletProvider.connectWithAdapter,
-                    icon: const Icon(Icons.wallet),
-                    label: const Text('Connect with Wallet Adapter'),
+                    icon: const Icon(Icons.bug_report),
+                    label: const Text('Demo Connection (Testing)'),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
@@ -76,10 +86,33 @@ class WalletConnectionCard extends StatelessWidget {
                 ),
                 
                 const SizedBox(height: 16),
-                Text(
-                  'Make sure you have Phantom wallet installed on your device',
-                  style: Theme.of(context).textTheme.bodySmall,
-                  textAlign: TextAlign.center,
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '💡 Connection Options:',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '• Phantom: Requires Phantom app installed\n'
+                        '• Demo: For testing without Phantom app',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

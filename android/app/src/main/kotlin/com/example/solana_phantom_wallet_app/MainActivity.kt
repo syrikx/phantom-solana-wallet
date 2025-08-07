@@ -33,7 +33,7 @@ class MainActivity: FlutterActivity() {
             Log.d("MainActivity", "URI path: ${data.path}")
             Log.d("MainActivity", "URI query: ${data.query}")
             
-            if (data.scheme == "phantommainnet") {
+            if (data.scheme == "phantommainnet" || data.scheme == "solana-phantom-wallet") {
                 Log.d("MainActivity", "Processing Phantom callback: ${data.toString()}")
                 
                 // Create method channel to communicate with Flutter
@@ -43,7 +43,7 @@ class MainActivity: FlutterActivity() {
                     Log.e("MainActivity", "Flutter engine not ready")
                 }
             } else {
-                Log.d("MainActivity", "URI scheme doesn't match phantommainnet: ${data.scheme}")
+                Log.d("MainActivity", "URI scheme doesn't match known schemes: ${data.scheme}")
             }
         } else {
             Log.d("MainActivity", "No URI data in intent")

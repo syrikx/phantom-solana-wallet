@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'dart:math';
 import '../services/solana_rpc_service.dart';
@@ -20,14 +18,14 @@ class WalletProvider extends ChangeNotifier {
   // Mainnet RPC endpoint
   static const String mainnetRpcUrl = 'https://api.mainnet-beta.solana.com';
   
-  // Phantom deep link schemes
-  static const String phantomUniversalLink = 'https://phantom.app/ul/';
-  static const String phantomDeepLink = 'phantom://';
-  
   // App metadata for Phantom
   static const String appName = 'Solana Phantom Wallet';
   static const String appUrl = 'https://phantom-solana-wallet.app';
-  static const String redirectScheme = 'phantommainnet';
+  static const String redirectScheme = 'solana-phantom-wallet';
+  
+  // Phantom deep link schemes
+  static const String phantomUniversalLink = 'https://phantom.app/ul/';
+  static const String phantomDeepLink = 'phantom://';
 
   String? get walletAddress => _walletAddress;
   bool get isConnected => _isConnected;
@@ -61,7 +59,7 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
-  // Connect to Phantom wallet via deep link (Mainnet)
+  // Connect to Phantom wallet using improved deep link approach
   Future<void> connectWithPhantom() async {
     try {
       _isConnecting = true;
@@ -69,27 +67,28 @@ class WalletProvider extends ChangeNotifier {
       _sessionId = _generateSessionId();
       notifyListeners();
 
+      debugPrint('Attempting to connect to Phantom using improved deep link approach...');
+      
       // Check if Phantom app is installed first
       final phantomInstalled = await _isPhantomInstalled();
       
       if (!phantomInstalled) {
-        throw Exception('Phantom wallet app is not installed. Please install Phantom from the App Store/Google Play.');
+        debugPrint('Phantom app not detected, trying universal link...');
       }
 
-      // Try to connect to Phantom with timeout
-      final connected = await _launchPhantomConnect();
+      // Launch Phantom connection using optimized deep link
+      final success = await _launchPhantomConnect();
       
-      if (connected) {
-        debugPrint('Phantom wallet connection initiated successfully');
+      if (success) {
+        debugPrint('Phantom connection launched successfully');
         _showConnectionPendingMessage();
-        
-        // Set a timeout for the connection
         _startConnectionTimeout();
       } else {
-        throw Exception('Failed to launch Phantom wallet app. Please try again.');
+        throw Exception('Failed to launch Phantom wallet app. Please ensure Phantom is installed and try again.');
       }
       
     } catch (error) {
+      debugPrint('Phantom connection error: $error');
       _errorMessage = 'Failed to connect to Phantom: $error';
       _isConnecting = false;
       notifyListeners();
@@ -135,7 +134,9 @@ class WalletProvider extends ChangeNotifier {
       _sessionId = _generateSessionId();
       notifyListeners();
 
-      // Create the connection request parameters
+      debugPrint('Attempting web browser connection...');
+      
+      // Create the connection request parameters for universal link
       final params = {
         'app_url': appUrl,
         'dapp_encryption_public_key': _generateEncryptionKey(),
@@ -148,11 +149,11 @@ class WalletProvider extends ChangeNotifier {
           .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
           .join('&');
       
-      // Use web browser to connect
+      // Use web browser to connect via universal link
       final webUrl = '${phantomUniversalLink}connect?$queryString';
       final Uri webUri = Uri.parse(webUrl);
       
-      debugPrint('Attempting web browser connection...');
+      debugPrint('Launching browser connection...');
       debugPrint('Web URL: $webUrl');
       
       final launched = await launchUrl(
@@ -169,6 +170,7 @@ class WalletProvider extends ChangeNotifier {
       }
       
     } catch (error) {
+      debugPrint('Browser connection error: $error');
       _errorMessage = 'Failed to connect via browser: $error';
       _isConnecting = false;
       notifyListeners();
@@ -181,47 +183,52 @@ class WalletProvider extends ChangeNotifier {
     debugPrint('This may take up to 2 minutes if you need to authenticate');
   }
   
-  // Launch Phantom app for wallet connection
+  // Optimized Phantom connection launcher
   Future<bool> _launchPhantomConnect() async {
-    // Create the connection request parameters
-    final params = {
-      'app_url': appUrl,
-      'dapp_encryption_public_key': _generateEncryptionKey(),
-      'redirect_link': '$redirectScheme://connected',
-      'cluster': 'mainnet-beta',
-    };
-    
-    // Encode parameters for URL
-    final queryString = params.entries
-        .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
-        .join('&');
-    
-    // Try Phantom deep link first (if app is installed)
-    final deepLinkUrl = '${phantomDeepLink}v1/connect?$queryString';
-    
     try {
-      debugPrint('Attempting to launch Phantom app...');
-      debugPrint('Deep link: $deepLinkUrl');
+      // Create the connection request parameters
+      final params = {
+        'app_url': appUrl,
+        'dapp_encryption_public_key': _generateEncryptionKey(),
+        'redirect_link': '$redirectScheme://connected',
+        'cluster': 'mainnet-beta',
+      };
+      
+      // Encode parameters for URL
+      final queryString = params.entries
+          .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+          .join('&');
+      
+      // Try Phantom deep link first (more direct)
+      final deepLinkUrl = '${phantomDeepLink}v1/connect?$queryString';
+      
+      debugPrint('Attempting Phantom deep link...');
+      debugPrint('Deep link URL: $deepLinkUrl');
       
       final Uri deepLinkUri = Uri.parse(deepLinkUrl);
       
-      // Force try the deep link launch
-      final launched = await launchUrl(
-        deepLinkUri,
-        mode: LaunchMode.externalApplication,
-      );
+      // Try to launch the deep link
+      bool launched = false;
+      try {
+        launched = await launchUrl(
+          deepLinkUri,
+          mode: LaunchMode.externalApplication,
+        );
+      } catch (e) {
+        debugPrint('Deep link failed: $e');
+      }
       
       if (launched) {
-        debugPrint('Phantom app launched successfully');
+        debugPrint('Deep link launched successfully');
         return true;
       } else {
-        debugPrint('Failed to launch Phantom deep link, trying universal link...');
+        debugPrint('Deep link failed, trying universal link...');
         
-        // Fallback to universal link (will redirect to app store if not installed)
+        // Fallback to universal link
         final universalLinkUrl = '${phantomUniversalLink}connect?$queryString';
         final Uri universalUri = Uri.parse(universalLinkUrl);
         
-        debugPrint('Universal link: $universalLinkUrl');
+        debugPrint('Universal link URL: $universalLinkUrl');
         
         final universalLaunched = await launchUrl(
           universalUri,
@@ -237,22 +244,8 @@ class WalletProvider extends ChangeNotifier {
         }
       }
     } catch (e) {
-      debugPrint('Error launching Phantom wallet: $e');
-      
-      // Last resort - try universal link
-      try {
-        final universalLinkUrl = '${phantomUniversalLink}connect?$queryString';
-        final Uri universalUri = Uri.parse(universalLinkUrl);
-        
-        debugPrint('Last resort: trying universal link...');
-        return await launchUrl(
-          universalUri,
-          mode: LaunchMode.externalApplication,
-        );
-      } catch (universalError) {
-        debugPrint('Universal link also failed: $universalError');
-        return false;
-      }
+      debugPrint('Error launching Phantom connection: $e');
+      return false;
     }
   }
   
@@ -604,7 +597,7 @@ class WalletProvider extends ChangeNotifier {
     }
   }
   
-  // Sign message with real Phantom wallet via deep link
+  // Sign message with Phantom wallet using improved deep link approach
   Future<String?> signMessage(String message) async {
     try {
       if (!_isConnected) {
@@ -618,7 +611,7 @@ class WalletProvider extends ChangeNotifier {
         return 'demo_signature_${timestamp}_${message.hashCode}';
       }
 
-      debugPrint('Requesting message signature from real Phantom wallet...');
+      debugPrint('Requesting message signature using improved deep link...');
       debugPrint('Network: Mainnet');
       debugPrint('Message: $message');
       
@@ -626,24 +619,23 @@ class WalletProvider extends ChangeNotifier {
       final success = await _launchPhantomSignMessage(message);
       
       if (success) {
-        // Set up a listener for the signature response
         _isConnecting = true;
         notifyListeners();
-        
-        // Return null for now - the actual signature will come via deep link
-        return null;
+        return null; // Signature will come via deep link response
       } else {
         throw Exception('Failed to launch Phantom for message signing');
       }
+      
     } catch (error) {
       debugPrint('Sign message error: $error');
       _errorMessage = 'Failed to sign message: $error';
+      _isConnecting = false;
       notifyListeners();
       return null;
     }
   }
   
-  // Launch Phantom for message signing
+  // Improved message signing launcher
   Future<bool> _launchPhantomSignMessage(String message) async {
     try {
       // Encode message to base64
@@ -671,12 +663,22 @@ class WalletProvider extends ChangeNotifier {
       
       final Uri deepLinkUri = Uri.parse(deepLinkUrl);
       
-      if (await canLaunchUrl(deepLinkUri)) {
-        return await launchUrl(
+      bool launched = false;
+      try {
+        launched = await launchUrl(
           deepLinkUri,
           mode: LaunchMode.externalApplication,
         );
+      } catch (e) {
+        debugPrint('Message signing deep link failed: $e');
+      }
+      
+      if (launched) {
+        debugPrint('Message signing deep link launched successfully');
+        return true;
       } else {
+        debugPrint('Deep link failed, trying universal link for signing...');
+        
         // Fallback to universal link
         final universalLinkUrl = '${phantomUniversalLink}signMessage?$queryString';
         final Uri universalUri = Uri.parse(universalLinkUrl);
@@ -716,7 +718,7 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
-  // Send SOL via Phantom wallet
+  // Send SOL via Phantom wallet using improved deep link approach
   Future<String?> sendSOL({
     required String recipientAddress,
     required double amount,
@@ -731,7 +733,7 @@ class WalletProvider extends ChangeNotifier {
         throw Exception('SOL transfer not available in demo mode. Connect real Phantom wallet.');
       }
 
-      debugPrint('Sending $amount SOL to $recipientAddress via Phantom...');
+      debugPrint('Sending $amount SOL to $recipientAddress using improved deep link...');
       
       // Launch Phantom for transaction
       final success = await _launchPhantomTransaction(recipientAddress, amount);
@@ -743,15 +745,17 @@ class WalletProvider extends ChangeNotifier {
       } else {
         throw Exception('Failed to launch Phantom for transaction');
       }
+      
     } catch (error) {
       debugPrint('SOL transfer error: $error');
       _errorMessage = 'Failed to send SOL: $error';
+      _isConnecting = false;
       notifyListeners();
       return null;
     }
   }
   
-  // Launch Phantom for SOL transaction
+  // Improved SOL transaction launcher
   Future<bool> _launchPhantomTransaction(String recipientAddress, double amount) async {
     try {
       // Convert SOL to lamports
@@ -780,12 +784,22 @@ class WalletProvider extends ChangeNotifier {
       
       final Uri deepLinkUri = Uri.parse(deepLinkUrl);
       
-      if (await canLaunchUrl(deepLinkUri)) {
-        return await launchUrl(
+      bool launched = false;
+      try {
+        launched = await launchUrl(
           deepLinkUri,
           mode: LaunchMode.externalApplication,
         );
+      } catch (e) {
+        debugPrint('Transaction deep link failed: $e');
+      }
+      
+      if (launched) {
+        debugPrint('Transaction deep link launched successfully');
+        return true;
       } else {
+        debugPrint('Deep link failed, trying universal link for transaction...');
+        
         // Fallback to universal link
         final universalLinkUrl = '${phantomUniversalLink}signAndSendTransaction?$queryString';
         final Uri universalUri = Uri.parse(universalLinkUrl);

@@ -45,12 +45,20 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
             
-            <!-- Deep link handling for Phantom wallet callbacks (Mainnet) -->
+            <!-- Deep link handling for Phantom wallet callbacks -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="phantommainnet" />
+            </intent-filter>
+            
+            <!-- Alternative deep link for phantom_connect package -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="solana-phantom-wallet" />
             </intent-filter>
         </activity>
         

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
 import 'providers/wallet_provider.dart';
 import 'screens/home_screen.dart';
 
@@ -16,11 +17,39 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late WalletProvider _walletProvider;
+  static const platform = MethodChannel('phantom_wallet_channel');
   
   @override
   void initState() {
     super.initState();
     _walletProvider = WalletProvider();
+    _initializeDeepLinkHandling();
+  }
+  
+  void _initializeDeepLinkHandling() {
+    // Set up method channel listener for Android deep links
+    platform.setMethodCallHandler(_handleMethodCall);
+    debugPrint('Deep link handler initialized with MethodChannel');
+  }
+  
+  Future<dynamic> _handleMethodCall(MethodCall call) async {
+    switch (call.method) {
+      case 'handlePhantomCallback':
+        final String uriString = call.arguments;
+        debugPrint('=== MAIN.DART PHANTOM CALLBACK ===');
+        debugPrint('Received Phantom callback: $uriString');
+        
+        try {
+          final Uri uri = Uri.parse(uriString);
+          await _walletProvider.handlePhantomResponse(uri);
+          debugPrint('Phantom response handled successfully');
+        } catch (e) {
+          debugPrint('Error handling Phantom callback: $e');
+        }
+        break;
+      default:
+        throw MissingPluginException('Not implemented: ${call.method}');
+    }
   }
 
   @override
@@ -34,6 +63,19 @@ class _MyAppState extends State<MyApp> {
           useMaterial3: true,
         ),
         home: const HomeScreen(),
+        // Handle deep link routes
+        onGenerateRoute: (settings) {
+          debugPrint('Route requested: ${settings.name}');
+          
+          // Handle Phantom callback
+          if (settings.name != null && settings.name!.startsWith('/phantom-callback')) {
+            final uri = Uri.parse(settings.name!);
+            _walletProvider.handlePhantomResponse(uri);
+            return MaterialPageRoute(builder: (_) => const HomeScreen());
+          }
+          
+          return MaterialPageRoute(builder: (_) => const HomeScreen());
+        },
       ),
     );
   }

@@ -13,7 +13,7 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('Solana Phantom Wallet'),
+        title: const Text('Solana Phantom Wallet v1.3.1'),
         centerTitle: true,
       ),
       body: Consumer<WalletProvider>(

@@ -57,7 +57,7 @@ class _MyAppState extends State<MyApp> {
     return ChangeNotifierProvider.value(
       value: _walletProvider,
       child: MaterialApp(
-        title: 'Solana Phantom Wallet',
+        title: 'Solana Phantom Wallet v1.3.1',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
           useMaterial3: true,
